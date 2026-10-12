@@ -1,69 +1,175 @@
-import Image from "next/image";
+// src/app/page.tsx
+// This component runs on the client side and is used to display the data from the database.
+"use client";
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+import { useEffect, useState } from "react";
+
+type Field = { name: string; type: "text" | "integer" | "boolean"; required: boolean };
+type Row = { id: number; [column: string]: unknown };
+
+export default function Page() {
+
+  // State variables
+  const [database, setDatabase] = useState("library");
+  const [label, setLabel] = useState("Library");
+  const [fields, setFields] = useState<Field[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [form, setForm] = useState<Record<string, unknown>>({});
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Loads the data from databases
+  async function load(key: string) {
+      setLoading(true);
+      setError(null);
+      try {
+          const response = await fetch(`/api/${key}`);
+          const data = await response.json();
+          if (!response.ok) {
+            setError(data.error ?? "Request failed");
+            setRows([]);
+            return;
+          }
+          setLabel(data.label);
+          setFields(data.fields);
+          setRows(data.rows);
+          setLoading(false);
+      } catch (error) {
+          setError(error instanceof Error ? error.message : "Unknown error");
+          setRows([]);
+          setLoading(false);
+      }
+  }
+
+  // Deletes a row from the database
+  async function deleteRow(id: number) {
+      setLoading(true);
+      setError(null);
+      if (!confirm("Delete this row?")) return;
+      try {
+          const response = await fetch(`/api/${database}/${id}`, { method: "DELETE" });
+          const data = await response.json();
+          if (!response.ok) {
+              setError(data.error ?? "Request failed");
+              return;
+          }
+          load(database);
+      } catch (error) {
+          setError(error instanceof Error ? error.message : "Unknown error");
+      }
+  }
+
+  // Handles the submission of the edit form
+  async function handleEditSubmit(event: React.SubmitEvent<HTMLFormElement>) {
+      event.preventDefault();
+      const formData = new FormData(event.target as HTMLFormElement);
+      const data = Object.fromEntries(formData);
+      if (editingId === null) {
+        //POST
+        const response = await fetch(`/api/${database}`, { method: "POST", body: JSON.stringify(data) });
+        const newRow = await response.json();
+        setRows([...rows, newRow]);
+        load(database);
+      } else if (typeof editingId === "number") {
+        //PATCH
+        const response = await fetch(`/api/${database}/${editingId}`, { method: "PATCH", body: JSON.stringify(data) });
+        const updatedRow = await response.json();
+        setRows(rows.map((row) => row.id === editingId ? updatedRow : row));
+        load(database);
+      }
+  }
+
+  // Handles the cancellation of the edit form
+  async function handleEditCancel() {
+      setEditingId(null);
+      setForm({});
+  }
+
+  // Edits a row
+  async function editRow(id: number) {
+      setEditingId(id);
+      const next: Record<string, unknown> = {};
+      for (const field of fields) next[field.name] = rows.find((row) => row.id === id)?.[field.name];
+      setForm(next);
+  }
+  
+  // Loads the data from the database when the database changes
+    useEffect(() => {
+        load(database);
+    }, [database]);
+
+    return (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-row gap-2">
+            {/* Select the database */}
+            <p className="font-bold text-lg">Select a database:</p>
+          <select className="font-bold text-lg"
+
+          value={database}
+          onChange={(event) => {
+              setDatabase(event.target.value);
+              setEditingId(null);
+              setForm({});
+              load(event.target.value);
+            }}>
+            <option value="library" className="text-black bg-white">Library</option>
+            <option value="equipment" className="text-black bg-white">Equipment</option>
+            <option value="directory" className="text-black bg-white">Directory</option>
+          </select>
+          </div>
+            <h1 className="text-2xl font-bold text-center">{label}</h1>
+            {loading && <p>Loading…</p>}
+            {error && <p className="text-red-500">{error}</p>}
+            {!loading && !error && rows.length === 0 && <p>No rows yet</p>}
+
+            {!loading && !error && rows.length > 0 && (
+                <table className="w-[90%] mx-auto border-separate border-spacing-2 border-gray-300 border-2 rounded-md">
+                    <thead className="text-left">
+                        <tr>
+                            {fields.map((field) => <th className="h-10 uppercase" key={field.name}>{field.name}</th>)}
+                            <th className="h-10 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-left">
+                        {rows.map((row) => (
+                            <tr key={row.id}>
+                                {fields.map((field) => <td className="" key={field.name}>{
+                                (field.type === "boolean") ? 
+                                (row[field.name] as boolean ? "Yes" : "No") :
+                                (row[field.name] as string ?? "")}
+                                </td>)}
+                                <td>
+                                    <button className="bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 mt-2 w-16" onClick={() => editRow(row.id)}>Edit</button>
+                                    <button className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 mt-2 w-16" onClick={() => deleteRow(row.id)}>Delete</button>
+
+                                </td>
+                              
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>                
+            )}
+
+            {editingId !== null && (
+                <form onSubmit={handleEditSubmit} className="w-[80%] mx-auto min-w-[400px]">
+                    {fields.map((field) => (
+                        <div key={field.name} className="mb-2 flex flex-row gap-2 justify-between ">
+                            <label htmlFor={field.name} className="font-bold text-lg mr-4 uppercase">{field.name}</label>
+                            <input className="border-2 border-gray-300 rounded-md p-2" type={field.type === "boolean" ? "checkbox" : field.type === "integer" ? "number" : field.type === "text" ? "text" : "text"} 
+                            id={field.name} name={field.name} required={field.required}
+                            {...(field.type === "boolean" ? { checked: form[field.name] as boolean } : { value: form[field.name] as string ?? "" })} 
+                            onChange={(event) => {
+                              setForm({ ...form, [field.name]: event.target.value });
+                            }}
+                            />
+                            
+                        </div>
+                    ))}
+                    <button className="bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600 mt-2 mx-2" onClick={handleEditCancel}>Cancel</button>
+                    <button className="bg-green-500 text-white px-2 py-1 rounded-md hover:bg-green-600 mt-2 mx-2" type="submit">Save</button>
+                </form>
+            )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    );
 }

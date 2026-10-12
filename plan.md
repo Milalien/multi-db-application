@@ -12,6 +12,8 @@ You write this. The blueprint below is enough to implement and defend the assign
 - **Modification:** insert, update, and delete on that database.
 - **Dummy data:** SQL seed files you run yourself, checked into `sql/`.
 
+
+
 ## Stack
 
 Next.js (App Router) + TypeScript + the `pg` driver. No ORM. You write the SQL, which is what you need to learn and to explain.
@@ -33,6 +35,8 @@ flowchart LR
   Pools --> Dir
 ```
 
+
+
 The browser never sends a raw database or table name into SQL. It sends a key (`library`, `equipment`, or `directory`). The server accepts only those three keys, then uses a fixed connection string and a fixed table name.
 
 **What that means in practice**
@@ -48,27 +52,31 @@ This is the whitelist. Without it, a client could try to put `books; DROP TABLE 
 
 Do not redo these. They are finished.
 
-| Path | Status |
-| --- | --- |
-| `sql/00_create_role_and_databases.sql` | written |
-| `sql/library.sql` | written |
-| `sql/equipment.sql` | written |
-| `sql/directory.sql` | written |
-| `.env.example` | written |
-| Next.js scaffold (`package.json`, `src/app/layout.tsx`, …) | written |
-| `src/lib/databases.ts` | started — keys, URLs, table names, column *name* lists. You still need field types (Step 4). |
-| `src/lib/pool.ts` | written — read Step 5 so you can explain every line |
+
+| Path                                                       | Status                                                                                       |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `sql/00_create_role_and_databases.sql`                     | written                                                                                      |
+| `sql/library.sql`                                          | written                                                                                      |
+| `sql/equipment.sql`                                        | written                                                                                      |
+| `sql/directory.sql`                                        | written                                                                                      |
+| `.env.example`                                             | written                                                                                      |
+| Next.js scaffold (`package.json`, `src/app/layout.tsx`, …) | written                                                                                      |
+| `src/lib/databases.ts`                                     | started — keys, URLs, table names, column *name* lists. You still need field types (Step 4). |
+| `src/lib/pool.ts`                                          | written — read Step 5 so you can explain every line                                          |
+
 
 Still empty or still the Next.js starter:
 
-| Path | What you write |
-| --- | --- |
-| `src/lib/rows.ts` | new file — turn a JSON body into typed values |
-| `src/app/api/[database]/route.ts` | `GET` list, `POST` insert |
-| `src/app/api/[database]/[id]/route.ts` | `PATCH` update, `DELETE` delete |
-| `src/app/page.tsx` | selector, table, form, edit, delete |
-| `README.md` | replace the create-next-app text |
-| `.env.local` | copy of `.env.example` on your machine (never commit) |
+
+| Path                                   | What you write                                        |
+| -------------------------------------- | ----------------------------------------------------- |
+| `src/lib/rows.ts`                      | new file — turn a JSON body into typed values         |
+| `src/app/api/[database]/route.ts`      | `GET` list, `POST` insert                             |
+| `src/app/api/[database]/[id]/route.ts` | `PATCH` update, `DELETE` delete                       |
+| `src/app/page.tsx`                     | selector, table, form, edit, delete                   |
+| `README.md`                            | replace the create-next-app text                      |
+| `.env.local`                           | copy of `.env.example` on your machine (never commit) |
+
 
 This repo is Next.js 16.4. In this version, dynamic route `params` is a Promise. Every handler must `await params` before reading `database` or `id`. Example is in Step 6.
 
@@ -108,6 +116,8 @@ DROP DATABASE IF EXISTS directory;
 DROP USER IF EXISTS campus;
 ```
 
+
+
 ### `sql/library.sql`
 
 ```sql
@@ -136,6 +146,8 @@ INSERT INTO books (title, author, published_year, available) VALUES
   ('Klara and the Sun', 'Kazuo Ishiguro', 2021, TRUE);
 ```
 
+
+
 ### `sql/equipment.sql`
 
 ```sql
@@ -161,6 +173,8 @@ INSERT INTO items (name, category, quantity, location) VALUES
   ('First aid kit', 'Safety', 2, 'Lobby'),
   ('Ethernet tester', 'Networking', 1, 'Storage B');
 ```
+
+
 
 ### `sql/directory.sql`
 
@@ -256,6 +270,8 @@ Three URLs, three database names at the end. Same user, same password, same host
 
 ---
 
+
+
 # How a request travels (read this before writing code)
 
 ```mermaid
@@ -275,13 +291,17 @@ sequenceDiagram
   Page->>Browser: table of books
 ```
 
+
+
 Words used below:
 
 - **Route handler** — a file named `route.ts` inside `src/app/api/...`. Next.js turns the folder path into a URL. `src/app/api/[database]/route.ts` becomes `/api/library`, `/api/equipment`, `/api/directory`. The `[database]` folder is a placeholder. The actual word in the URL is `params.database`.
-- **`pg.Pool`** — a small set of reusable TCP connections to **one** Postgres database. Opening a new connection on every click is slow and Postgres will eventually refuse more connections. A pool opens a few, hands one out for a query, then puts it back.
-- **Placeholder (`$1`, `$2`)** — the safe way to put values into SQL. `pg` sends the SQL string and the values array separately. Postgres never treats a value as SQL. Never write `` `DELETE FROM ${table} WHERE id = ${id}` `` using a value from the URL or body.
+- `pg.Pool` — a small set of reusable TCP connections to **one** Postgres database. Opening a new connection on every click is slow and Postgres will eventually refuse more connections. A pool opens a few, hands one out for a query, then puts it back.
+- **Placeholder (**`$1`**,** `$2`**)** — the safe way to put values into SQL. `pg` sends the SQL string and the values array separately. Postgres never treats a value as SQL. Never write `DELETE FROM ${table} WHERE id = ${id}` using a value from the URL or body.
 
 ---
+
+
 
 # Build order (do these in this order)
 
@@ -299,7 +319,11 @@ Words used below:
 
 ---
 
+
+
 # Step 4 — Extend `src/lib/databases.ts`
+
+
 
 ## What is already there
 
@@ -369,6 +393,8 @@ export function isDatabaseKey(value: string): value is DatabaseKey {
 - `value in databases` is `true` only for `"library"`, `"equipment"`, `"directory"`.
 - `value is DatabaseKey` is a TypeScript predicate. After `if (!isDatabaseKey(database)) return 404`, TypeScript treats `database` as `"library" | "equipment" | "directory"`. Then `databases[database]` and `getPool(database)` compile.
 
+
+
 ## Finished file
 
 Replace the whole file with this. Copy it, then read it until you can say what each key is for.
@@ -425,6 +451,8 @@ export function isDatabaseKey(value: string): value is DatabaseKey {
 
 ---
 
+
+
 # Step 5 — What `src/lib/pool.ts` does (already written)
 
 A `pg.Pool` talks to **one** database. The database name is the last part of the URL (`.../library`). One pool cannot query `equipment` and `library`. You need up to three pools.
@@ -454,6 +482,10 @@ flowchart LR
   map --> dirPool
 ```
 
+
+
+
+
 ## The file, line by line
 
 ```ts
@@ -479,19 +511,21 @@ export function getPool(key: DatabaseKey): Pool {
 }
 ```
 
-| Lines | What they do |
-| --- | --- |
-| `import { Pool }` | The `pg` class. One instance = one pool = one database. |
-| `import { databases, type DatabaseKey }` | Need the URL for that key. `DatabaseKey` limits the argument to the three names. |
-| `globalThis as ... { pgPools?: ... }` | `globalThis` is the process-wide object (`global` in Node). We store the map there in development. |
-| `pools = globalForPg.pgPools ?? new Map(...)` | If a previous hot reload already created the map, reuse it. Otherwise start empty. `Map<DatabaseKey, Pool>` means at most three entries: library, equipment, directory. |
+
+| Lines                                                        | What they do                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import { Pool }`                                            | The `pg` class. One instance = one pool = one database.                                                                                                                                                                                                                                                     |
+| `import { databases, type DatabaseKey }`                     | Need the URL for that key. `DatabaseKey` limits the argument to the three names.                                                                                                                                                                                                                            |
+| `globalThis as ... { pgPools?: ... }`                        | `globalThis` is the process-wide object (`global` in Node). We store the map there in development.                                                                                                                                                                                                          |
+| `pools = globalForPg.pgPools ?? new Map(...)`                | If a previous hot reload already created the map, reuse it. Otherwise start empty. `Map<DatabaseKey, Pool>` means at most three entries: library, equipment, directory.                                                                                                                                     |
 | `if (NODE_ENV !== "production") globalForPg.pgPools = pools` | `next dev` reloads modules when you save a file. A module-level `const pools = new Map()` would be a *new* empty map after each save, while the old pools stay open in the background. Pinning the map on `globalThis` survives the reload. Production does not hot-reload, so this is only for `next dev`. |
-| `getPool(key)` | Only function routes call. |
-| `pools.get(key)` / `if (existing) return existing` | Already created? Hand it back. No new TCP connections beyond the pool’s own idle set (default max 10). |
-| `databases[key].connectionString` | The URL from `.env.local` for that one database. |
-| `if (!connectionString) throw` | Fail with a clear message if `.env.local` is missing, instead of `pg` saying something about `undefined`. |
-| `new Pool({ connectionString })` | Create the pool. Connections are opened lazily on the first `query`. |
-| `pools.set(key, pool)` | Remember it for the next call. |
+| `getPool(key)`                                               | Only function routes call.                                                                                                                                                                                                                                                                                  |
+| `pools.get(key)` / `if (existing) return existing`           | Already created? Hand it back. No new TCP connections beyond the pool’s own idle set (default max 10).                                                                                                                                                                                                      |
+| `databases[key].connectionString`                            | The URL from `.env.local` for that one database.                                                                                                                                                                                                                                                            |
+| `if (!connectionString) throw`                               | Fail with a clear message if `.env.local` is missing, instead of `pg` saying something about `undefined`.                                                                                                                                                                                                   |
+| `new Pool({ connectionString })`                             | Create the pool. Connections are opened lazily on the first `query`.                                                                                                                                                                                                                                        |
+| `pools.set(key, pool)`                                       | Remember it for the next call.                                                                                                                                                                                                                                                                              |
+
 
 Routes do this, and never `new Pool` themselves:
 
@@ -505,6 +539,8 @@ const result = await pool.query(
 `pool.query(sql, values)` runs SQL. The optional second argument is the array that fills `$1`, `$2`, …
 
 ---
+
+
 
 # Step 6 — Shared parse: `src/lib/rows.ts`
 
@@ -539,18 +575,22 @@ export type ParseResult =
   | { ok: false; error: string };
 ```
 
+
+
 ## Algorithm (walk `config.fields` in order)
 
 1. If `body` is not a plain object (`null`, array, string), return `{ ok: false, error: "Expected a JSON object" }`.
 2. Create an empty `values` array.
 3. For each field in `databases[key].fields`, in that order:
-   - Read `body[field.name]`. Extra keys on the body (`id`, `foo`) are ignored.
-   - **text + required:** must be a string. After `.trim()`, must not be `""`. Push the trimmed string.
-   - **text + not required** (`phone`): missing, `null`, or `""` after trim becomes `null`. Otherwise push the trimmed string.
-   - **integer + required** (`quantity`): accept a JSON number (`5`) or a numeric string (`"5"`). `Number(...)` then `Number.isInteger`. Reject `NaN`, `1.5`, `"abc"`, and values `< 0`. Push the number.
-   - **integer + not required** (`published_year`): missing, `null`, or `""` becomes `null`. Otherwise same integer rules as above (including `< 0` and non-integers). The table CHECK also rejects years outside 1000–2100; you may reject those here or let Postgres return `23514`.
-   - **boolean** (`available`): accept only the booleans `true` and `false`. Reject `"true"`, `1`, `0`.
+  - Read `body[field.name]`. Extra keys on the body (`id`, `foo`) are ignored.
+  - **text + required:** must be a string. After `.trim()`, must not be `""`. Push the trimmed string.
+  - **text + not required** (`phone`): missing, `null`, or `""` after trim becomes `null`. Otherwise push the trimmed string.
+  - **integer + required** (`quantity`): accept a JSON number (`5`) or a numeric string (`"5"`). `Number(...)` then `Number.isInteger`. Reject `NaN`, `1.5`, `"abc"`, and values `< 0`. Push the number.
+  - **integer + not required** (`published_year`): missing, `null`, or `""` becomes `null`. Otherwise same integer rules as above (including `< 0` and non-integers). The table CHECK also rejects years outside 1000–2100; you may reject those here or let Postgres return `23514`.
+  - **boolean** (`available`): accept only the booleans `true` and `false`. Reject `"true"`, `1`, `0`.
 4. Return `{ ok: true, values }`.
+
+
 
 ## Example outcomes
 
@@ -591,6 +631,8 @@ export function parseRow(
 Inside the loop, `field.name` is the key into the object (`title`, `quantity`, …). Use a type assertion if TypeScript complains that `body` has no index signature, for example `const raw = (body as Record<string, unknown>)[field.name]`.
 
 ---
+
+
 
 # Step 7 — `src/app/api/[database]/route.ts` (`GET` and `POST`)
 
@@ -680,6 +722,8 @@ Check before writing POST: start `npm run dev`, open these in the browser:
 - `http://localhost:3000/api/directory` — six contacts
 - `http://localhost:3000/api/postgres` — `{ "error": "Unknown database" }` and status 404
 
+
+
 ## POST
 
 1. `const body = await request.json()` (wrap in try/catch; invalid JSON → 400 `"Expected a JSON object"`).
@@ -716,10 +760,12 @@ return Response.json(result.rows[0], { status: 201 });
 
 `pg` errors have a `code` string. Narrow with `'code' in err`.
 
-| `err.code` | Meaning | HTTP status | When it happens |
-| --- | --- | --- | --- |
-| `23505` | unique_violation | 409 | directory `email` already exists |
-| `23514` | check_violation | 400 | `quantity < 0`, or `published_year` outside 1000–2100 |
+
+| `err.code` | Meaning          | HTTP status | When it happens                                       |
+| ---------- | ---------------- | ----------- | ----------------------------------------------------- |
+| `23505`    | unique_violation | 409         | directory `email` already exists                      |
+| `23514`    | check_violation  | 400         | `quantity < 0`, or `published_year` outside 1000–2100 |
+
 
 Anything else in the `catch`: 500 `"Database unavailable"`.
 
@@ -738,6 +784,8 @@ Anything else in the `catch`: 500 `"Database unavailable"`.
 ```
 
 ---
+
+
 
 # Step 8 — `src/app/api/[database]/[id]/route.ts` (`PATCH` and `DELETE`)
 
@@ -775,6 +823,8 @@ Why `Number(idParam)` and `Number.isInteger`:
 - `Number("3")` is `3`. `Number("abc")` is `NaN`. `Number("3.2")` is `3.2`.
 - `Number.isInteger(id) && id > 0` rejects `NaN`, `0`, negatives, and floats.
 - This `id` becomes `$n` in the query. Never take `id` from the JSON body. A client must not rename row 3 into row 1 by sending `{ "id": 1 }`.
+
+
 
 ## PATCH
 
@@ -839,6 +889,8 @@ if (result.rowCount === 0) {
 return Response.json({ id });
 ```
 
+
+
 ## PowerShell checks (dev server must be running)
 
 ```powershell
@@ -868,6 +920,8 @@ psql -U campus -d directory -f sql/directory.sql
 
 ---
 
+
+
 # Step 9 — `src/app/page.tsx`
 
 Replace the whole starter page. This file is a **client component**. First line:
@@ -896,16 +950,20 @@ const [loading, setLoading] = useState(true);
 const [error, setError] = useState<string | null>(null);
 ```
 
-| State | Meaning |
-| --- | --- |
-| `database` | Which key is selected. Starts as `"library"`. Used in every `fetch` URL. |
-| `label` | Heading text from the API (`"Library"`). |
-| `fields` | Column descriptors from the API. Drives the table headers and the form inputs. |
-| `rows` | Current table data. |
-| `form` | The values sitting in the inputs. Keys are field names (`title`, `quantity`, …). |
+
+| State       | Meaning                                                                                   |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| `database`  | Which key is selected. Starts as `"library"`. Used in every `fetch` URL.                  |
+| `label`     | Heading text from the API (`"Library"`).                                                  |
+| `fields`    | Column descriptors from the API. Drives the table headers and the form inputs.            |
+| `rows`      | Current table data.                                                                       |
+| `form`      | The values sitting in the inputs. Keys are field names (`title`, `quantity`, …).          |
 | `editingId` | `null` means the form will `POST` (create). A number means the form will `PATCH` that id. |
-| `loading` | True while a request is in flight. Show “Loading…”. |
-| `error` | Last failure message, or `null`. |
+| `loading`   | True while a request is in flight. Show “Loading…”.                                       |
+| `error`     | Last failure message, or `null`.                                                          |
+
+
+
 
 ## Load rows
 
@@ -958,6 +1016,8 @@ Changing the select updates `database` → `useEffect` refetches. Clearing `form
 {!loading && !error && rows.length === 0 && <p>No rows yet</p>}
 ```
 
+
+
 ## Table
 
 When `fields` is `[{ name: "title", ... }, ...]`, headers are those `name`s plus an Actions column.
@@ -973,24 +1033,26 @@ Display rules:
 Each row has two buttons:
 
 - **Edit** — `setEditingId(row.id)` and copy that row into `form` (only the field names, not `id`):
-
   ```ts
   const next: Record<string, unknown> = {};
   for (const field of fields) next[field.name] = row[field.name];
   setForm(next);
   ```
-
 - **Delete** — `if (!confirm("Delete this row?")) return;` then `fetch(`/api/${database}/${row.id}`, { method: "DELETE" })`. If not ok, set error. If ok, `load(database)`.
+
+
 
 ## Form
 
 One form, not three. Loop `fields` and pick the input from `field.type`:
 
-| `field.type` | Input | How to read it |
-| --- | --- | --- |
-| `"text"` | `<input type="text">` | string |
-| `"integer"` | `<input type="number">` | string from the input; `rows.ts` coerces to number. Empty string is allowed for optional integers. |
-| `"boolean"` | `<input type="checkbox">` | `event.target.checked` (real boolean) |
+
+| `field.type` | Input                     | How to read it                                                                                     |
+| ------------ | ------------------------- | -------------------------------------------------------------------------------------------------- |
+| `"text"`     | `<input type="text">`     | string                                                                                             |
+| `"integer"`  | `<input type="number">`   | string from the input; `rows.ts` coerces to number. Empty string is allowed for optional integers. |
+| `"boolean"`  | `<input type="checkbox">` | `event.target.checked` (real boolean)                                                              |
+
 
 `value={form[field.name] ?? ""}` for text/integer. `checked={form[field.name] === true}` for boolean. `onChange` writes that field back into `form` and leaves the other keys alone.
 
@@ -1014,6 +1076,8 @@ A Cancel button (shown only when `editingId !== null`) clears `editingId` and `f
 
 ---
 
+
+
 # Step 10 — README
 
 Replace the create-next-app boilerplate. Include, in this order:
@@ -1027,6 +1091,8 @@ Replace the create-next-app boilerplate. Include, in this order:
 
 ---
 
+
+
 # Demo script for grading
 
 - Start Postgres, then `npm run dev`.
@@ -1036,6 +1102,8 @@ Replace the create-next-app boilerplate. Include, in this order:
 - Delete a directory contact and refresh.
 
 ---
+
+
 
 # Out of scope
 
