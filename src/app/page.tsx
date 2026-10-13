@@ -18,6 +18,7 @@ export default function Page() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   // Loads the data from databases
   async function load(key: string) {
@@ -63,37 +64,61 @@ export default function Page() {
   // Handles the submission of the edit form
   async function handleEditSubmit(event: React.SubmitEvent<HTMLFormElement>) {
       event.preventDefault();
-      const formData = new FormData(event.target as HTMLFormElement);
-      const data = Object.fromEntries(formData);
       if (editingId === null) {
         //POST
-        const response = await fetch(`/api/${database}`, { method: "POST", body: JSON.stringify(data) });
+        const response = await fetch(`/api/${database}`, { 
+            method: "POST", 
+            body: JSON.stringify(form) 
+        });
         const newRow = await response.json();
         setRows([...rows, newRow]);
         load(database);
+        setEditingId(null);
+        setAdding(false);
+        setForm({});
       } else if (typeof editingId === "number") {
         //PATCH
-        const response = await fetch(`/api/${database}/${editingId}`, { method: "PATCH", body: JSON.stringify(data) });
+        const response = await fetch(`/api/${database}/${editingId}`, { 
+            method: "PATCH", 
+            body: JSON.stringify(form) 
+        });
         const updatedRow = await response.json();
         setRows(rows.map((row) => row.id === editingId ? updatedRow : row));
         load(database);
+        setEditingId(null);
+        setAdding(false);
+        setForm({});
       }
   }
 
   // Handles the cancellation of the edit form
   async function handleEditCancel() {
       setEditingId(null);
+      setAdding(false);
       setForm({});
   }
 
   // Edits a row
-  async function editRow(id: number) {
-      setEditingId(id);
-      const next: Record<string, unknown> = {};
-      for (const field of fields) next[field.name] = rows.find((row) => row.id === id)?.[field.name];
-      setForm(next);
+  function editRow(id: number) {
+    setAdding(false);
+    setEditingId(id);
+    const next: Record<string, unknown> = {};
+    for (const field of fields) next[field.name] = rows.find((row) => row.id === id)?.[field.name];
+    setForm(next);
   }
-  
+
+  // Adds a new row
+  function addRow() {
+    setEditingId(null);
+    setAdding(true);
+    const next: Record<string, unknown> = {};
+    for (const field of fields) {
+      next[field.name] =
+        field.type === "boolean" ? false : field.type === "integer" ? 0 : "";
+    }
+    setForm(next);
+  }
+
   // Loads the data from the database when the database changes
     useEffect(() => {
         load(database);
@@ -122,16 +147,15 @@ export default function Page() {
             {loading && <p>Loading…</p>}
             {error && <p className="text-red-500">{error}</p>}
             {!loading && !error && rows.length === 0 && <p>No rows yet</p>}
-
             {!loading && !error && rows.length > 0 && (
-                <table className="w-[90%] mx-auto border-separate border-spacing-2 border-gray-300 border-2 rounded-md">
-                    <thead className="text-left">
+                <table className="w-[90%] max-w-[850px] mx-auto rounded-md">
+                    <thead className="text-center">
                         <tr>
-                            {fields.map((field) => <th className="h-10 uppercase" key={field.name}>{field.name}</th>)}
-                            <th className="h-10 uppercase">Actions</th>
+                            {fields.map((field) => <th className="h-10 p-2 uppercase" key={field.name}>{field.name}</th>)}
+                            <th className="h-10 p-2 uppercase">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="text-left">
+                    <tbody className="text-center">
                         {rows.map((row) => (
                             <tr key={row.id}>
                                 {fields.map((field) => <td className="" key={field.name}>{
@@ -139,36 +163,43 @@ export default function Page() {
                                 (row[field.name] as boolean ? "Yes" : "No") :
                                 (row[field.name] as string ?? "")}
                                 </td>)}
-                                <td>
-                                    <button className="bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 mt-2 w-16" onClick={() => editRow(row.id)}>Edit</button>
-                                    <button className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 mt-2 w-16" onClick={() => deleteRow(row.id)}>Delete</button>
+                                <td className="flex flex-col justify-center items-center h-full py-2">
+                                    <button className="bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 w-16 m-1" onClick={() => editRow(row.id)}>Edit</button>
+                                    <button className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 w-16 m-1" onClick={() => deleteRow(row.id)}>Delete</button>
 
                                 </td>
                               
                             </tr>
                         ))}
+                        <tr>
+                            <td colSpan={fields.length + 1} className="text-center">
+                                <button className="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 w-16 m-1" onClick={() => addRow()}>Add</button>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>                
             )}
 
-            {editingId !== null && (
-                <form onSubmit={handleEditSubmit} className="w-[80%] mx-auto min-w-[400px]">
+            {(adding || editingId !== null) && (
+                <form onSubmit={handleEditSubmit} className="w-[500px] mx-auto">
                     {fields.map((field) => (
-                        <div key={field.name} className="mb-2 flex flex-row gap-2 justify-between ">
-                            <label htmlFor={field.name} className="font-bold text-lg mr-4 uppercase">{field.name}</label>
-                            <input className="border-2 border-gray-300 rounded-md p-2" 
-                            type={field.type === "boolean" ? "checkbox" : field.type === "integer" ? "number" : field.type === "text" ? "text" : "text"} 
-                            id={field.name} name={field.name} required={field.required}
-                            {...(field.type === "boolean" ? { checked: form[field.name] as boolean } : { value: form[field.name] as string ?? "" })} 
+                        <div key={field.name} className="mb-2 flex flex-col gap-2 align-start justify-start">
+                            <label htmlFor={field.name} className="font-bold text-lg uppercase">{field.name}</label>
+                            <input className={field.type === "boolean" ? "w-8 border-2 border-gray-300 rounded-md p-2 h-8" : "w-full border-2 border-gray-300 rounded-md p-2 h-8"} 
+                            type={field.type === "boolean" ? "checkbox" : field.type === "integer" ? "number" : "text"}
+                            required={field.required && field.type !== "boolean"}
+                            {...(field.type === "boolean"
+                              ? { checked: Boolean(form[field.name]) }
+                              : { value: (form[field.name] as string) ?? "" })}
                             onChange={(event) => {
-                              setForm({ ...form, [field.name]: field.type === "boolean" ? event.target.checked : event.target.value });
+                              const value = field.type === "boolean" ? event.target.checked : event.target.value;
+                              setForm({ ...form, [field.name]: value });
                             }}
                             />
-                            
                         </div>
                     ))}
-                    <button className="bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600 mt-2 mx-2" onClick={handleEditCancel}>Cancel</button>
-                    <button className="bg-green-500 text-white px-2 py-1 rounded-md hover:bg-green-600 mt-2 mx-2" type="submit">Save</button>
+                    <button className="bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600 mr-2 mt-2" onClick={handleEditCancel}>Cancel</button>
+                    <button className="bg-green-500 text-white px-2 py-1 rounded-md hover:bg-green-600 mt-2" type="submit">Save</button>
                 </form>
             )}
         </div>
