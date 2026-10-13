@@ -156,11 +156,12 @@ export default function Page() {
                     {fields.map((field) => (
                         <div key={field.name} className="mb-2 flex flex-row gap-2 justify-between ">
                             <label htmlFor={field.name} className="font-bold text-lg mr-4 uppercase">{field.name}</label>
-                            <input className="border-2 border-gray-300 rounded-md p-2" type={field.type === "boolean" ? "checkbox" : field.type === "integer" ? "number" : field.type === "text" ? "text" : "text"} 
+                            <input className="border-2 border-gray-300 rounded-md p-2" 
+                            type={field.type === "boolean" ? "checkbox" : field.type === "integer" ? "number" : field.type === "text" ? "text" : "text"} 
                             id={field.name} name={field.name} required={field.required}
                             {...(field.type === "boolean" ? { checked: form[field.name] as boolean } : { value: form[field.name] as string ?? "" })} 
                             onChange={(event) => {
-                              setForm({ ...form, [field.name]: event.target.value });
+                              setForm({ ...form, [field.name]: field.type === "boolean" ? event.target.checked : event.target.value });
                             }}
                             />
                             
